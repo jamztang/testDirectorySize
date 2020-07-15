@@ -90,6 +90,27 @@ static long long fileSystemFreeSize(NSString *path)
 	return [attributes[NSFileSystemFreeSize] unsignedLongLongValue];
 }
 
+static long long fileSystemSize(NSString *path)
+{
+    BOOL isDirectory;
+
+    long long size = 0;
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory]) {
+
+        if (isDirectory) {
+            NSString *path;
+            while (path = [[[NSFileManager defaultManager] enumeratorAtPath:path] nextObject]) {
+                size += fileSystemSize(path);
+            }
+        } else {
+            NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfFileSystemForPath:path error:NULL];
+
+            size += [attributes[NSFileSize] unsignedLongLongValue];
+        }
+    }
+    return size;
+}
+
 - (void)log:(NSString *)message
 {
 	NSLog(@"%@", message);
@@ -104,7 +125,7 @@ static long long fileSystemFreeSize(NSString *path)
 
 	NSString *cachesDirectory = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES)[0];
 	NSString *testDirectory = [cachesDirectory stringByAppendingPathComponent:@"Test"];
-	[self log:[NSString stringWithFormat:@"    preparing %ld test files...", fileCount]];
+	[self log:[NSString stringWithFormat:@"    preparing %ld test files... %@", fileCount, testDirectory]];
 
 	createTestDirectoryAtPath(testDirectory, fileCount / 2);
 	createTestDirectoryAtPath([testDirectory stringByAppendingPathComponent:@"SubDirectory"], fileCount / 2);
@@ -124,12 +145,13 @@ static long long fileSystemFreeSize(NSString *path)
 	[self log:[NSString stringWithFormat:@"    time: %.3f s", duration]];
 
 	[self log:[NSString stringWithFormat:@"    cleaning up..."]];
-
+    long long size = fileSystemSize(testDirectory);
+//
 	long long availableSizeBefore = fileSystemFreeSize(cachesDirectory);
 	[[NSFileManager defaultManager] removeItemAtPath:testDirectory error:NULL];
 	long long availableSizeAfter = fileSystemFreeSize(cachesDirectory);
 
-	[self log:[NSString stringWithFormat:@"    actual bytes: %@", [sizeFormatter stringFromByteCount:availableSizeAfter - availableSizeBefore]]];
+	[self log:[NSString stringWithFormat:@"    actual bytes: %@ vs fileSystemSize: %@", [sizeFormatter stringFromByteCount:availableSizeAfter - availableSizeBefore], [sizeFormatter stringFromByteCount: size]]];
 }
 
 @end
